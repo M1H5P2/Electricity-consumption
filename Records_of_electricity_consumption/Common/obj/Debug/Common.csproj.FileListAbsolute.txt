@@ -1,0 +1,6 @@
+C:\Users\Milko\Desktop\predmeti\virtualizacija_procesa\Records_of_electricity_consumption\Common\bin\Debug\Common.dll
+C:\Users\Milko\Desktop\predmeti\virtualizacija_procesa\Records_of_electricity_consumption\Common\bin\Debug\Common.pdb
+C:\Users\Milko\Desktop\predmeti\virtualizacija_procesa\Records_of_electricity_consumption\Common\obj\Debug\Common.csproj.AssemblyReference.cache
+C:\Users\Milko\Desktop\predmeti\virtualizacija_procesa\Records_of_electricity_consumption\Common\obj\Debug\Common.csproj.CoreCompileInputs.cache
+C:\Users\Milko\Desktop\predmeti\virtualizacija_procesa\Records_of_electricity_consumption\Common\obj\Debug\Common.dll
+C:\Users\Milko\Desktop\predmeti\virtualizacija_procesa\Records_of_electricity_consumption\Common\obj\Debug\Common.pdb
