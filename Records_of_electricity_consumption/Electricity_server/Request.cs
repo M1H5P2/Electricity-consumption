@@ -30,6 +30,7 @@ namespace Electricity_server
         private static string solutionDirectory = Directory.GetParent(parentDirectory2).FullName;
         private static readonly string folder = Path.Combine(solutionDirectory, "load_tables");
         private static readonly string auditFile = Path.Combine(solutionDirectory, "audit_folder\\TBL_AUDIT.xml");
+        private static readonly string auditFolder = Path.Combine(solutionDirectory, "audit_folder");
         private Thread cleanupThread;
         private readonly object lockObject = new object();
         private bool isRunning;
@@ -49,7 +50,7 @@ namespace Electricity_server
                     SearchThroughDatabase(folder, list, date, response,ref i);
                     if (i != 0)
                     {
-                        CreateAudit(date, auditFile, response, messageType.Info);
+                        CreateAudit(date, auditFile, response, messageType.Info, auditFolder);
                     }
                 }
                 else
@@ -60,19 +61,19 @@ namespace Electricity_server
                         SearchThroughDatabase(folder, list, date, response,ref i);
                         if (i != 0)
                         {
-                            CreateAudit(date, auditFile, response, messageType.Info);
+                            CreateAudit(date, auditFile, response, messageType.Info, auditFolder);
                         }
                     }
                     else
                     {
-                        CreateAudit(date, auditFile, response, messageType.Info);
+                        CreateAudit(date, auditFile, response, messageType.Info, auditFolder);
                     }
                 }
                 if (i == 0)
                 {
                     ForecastTheElectricity(date,folder);
                     Console.WriteLine("Another XML table created successfully");
-                    CreateAudit(date, auditFile, response, messageType.Error);
+                    CreateAudit(date, auditFile, response, messageType.Error, auditFolder);
                 }
                 cf.Close();
             }
@@ -186,7 +187,7 @@ namespace Electricity_server
                         response.Answer(l, null);
                         if (mValue >= 6800)
                         {
-                            CreateAudit(date, auditFile, response, messageType.Warning);
+                            CreateAudit(date, auditFile, response, messageType.Warning,auditFolder);
                         }
                     }
                     else
@@ -199,71 +200,111 @@ namespace Electricity_server
             AddToDictionary(loads);
         }
         
-        private void CreateAudit(DateTime date, string existingAudit, IResponse response, messageType typ)
+        private void CreateAudit(DateTime date, string existingAudit, IResponse response, messageType typ, string folder)
         {
-            int i = 103;
-            
-            XmlWriterSettings settings = new XmlWriterSettings
+
+            if (File.Exists(existingAudit))
             {
-                Indent = true,
-                IndentChars = "\t" // Use tab for indentation (optional)
-            };
-            
-            DateTime now = DateTime.Now;
-            string messag = "";
-            XmlDocument xmlDocument = new XmlDocument();
-            xmlDocument.Load(existingAudit);
-            XmlNodeList rowNodes = xmlDocument.SelectNodes("//row");
-            int elementId=0;
-            foreach (XmlNode rowNode in rowNodes)
-            {
-                XmlNodeList childNodes = rowNode.ChildNodes;
-                foreach (XmlNode childNode in childNodes)
+                int i = 103;
+
+                XmlWriterSettings settings = new XmlWriterSettings
                 {
-                    string elementName = childNode.Name;
-                    if (elementName.Equals("ID"))
+                    Indent = true,
+                    IndentChars = "\t" // Use tab for indentation (optional)
+                };
+
+                DateTime now = DateTime.Now;
+                string messag = "";
+                XmlDocument xmlDocument = new XmlDocument();
+                xmlDocument.Load(existingAudit);
+                XmlNodeList rowNodes = xmlDocument.SelectNodes("//row");
+                int elementId = 0;
+                foreach (XmlNode rowNode in rowNodes)
+                {
+                    XmlNodeList childNodes = rowNode.ChildNodes;
+                    foreach (XmlNode childNode in childNodes)
                     {
-                        string elementValue = childNode.InnerText;
-                        elementId = Convert.ToInt32(elementValue);
-                                                
+                        string elementName = childNode.Name;
+                        if (elementName.Equals("ID"))
+                        {
+                            string elementValue = childNode.InnerText;
+                            elementId = Convert.ToInt32(elementValue);
+
+                        }
                     }
                 }
-            }
-            while(i <= elementId)
-            {
-                i++;
-            }
-            XmlNode rows = xmlDocument.SelectSingleNode("rows");
-            XmlElement row = xmlDocument.CreateElement("row");
-            XmlElement rowId = xmlDocument.CreateElement("ID");
-            rowId.InnerText = $"{i}";
-            row.AppendChild(rowId);
-            XmlElement time_stamp = xmlDocument.CreateElement("TIME_STAMP");
-            time_stamp.InnerText = $"{now.ToString("yyyy-MM-dd HH:mm:ss.fff")}";
-            row.AppendChild(time_stamp);
-            XmlElement messageTyp = xmlDocument.CreateElement("MESSAGE_TYPE");
-            messageTyp.InnerText = $"{typ}";
-            row.AppendChild(messageTyp);
-            if(typ == messageType.Error) {
-                messag = $"There is no data for date {date.Date.ToString("yyyy-MM-dd")} in the database";
-            }
-            else if(typ == messageType.Info)
-            {
-                messag = "Data is successfully read and forwarded";
+                while (i <= elementId)
+                {
+                    i++;
+                }
+                XmlNode rows = xmlDocument.SelectSingleNode("rows");
+                XmlElement row = xmlDocument.CreateElement("row");
+                XmlElement rowId = xmlDocument.CreateElement("ID");
+                rowId.InnerText = $"{i}";
+                row.AppendChild(rowId);
+                XmlElement time_stamp = xmlDocument.CreateElement("TIME_STAMP");
+                time_stamp.InnerText = $"{now.ToString("yyyy-MM-dd HH:mm:ss.fff")}";
+                row.AppendChild(time_stamp);
+                XmlElement messageTyp = xmlDocument.CreateElement("MESSAGE_TYPE");
+                messageTyp.InnerText = $"{typ}";
+                row.AppendChild(messageTyp);
+                if (typ == messageType.Error)
+                {
+                    messag = $"There is no data for date {date.Date.ToString("yyyy-MM-dd")} in the database";
+                }
+                else if (typ == messageType.Info)
+                {
+                    messag = "Data is successfully read and forwarded";
+                }
+                else
+                {
+                    messag = "Measured value for electricity consumption went over red zone of 6800";
+                }
+                XmlElement m = xmlDocument.CreateElement("MESSAGE");
+                m.InnerText = messag;
+                row.AppendChild(m);
+                rows.AppendChild(row);
+                xmlDocument.Save(existingAudit);
+                Audit a = new Audit(i, date, typ, messag);
+                response.Answer(null, a);
+                DateTime dateKey = DateTime.Now.AddMinutes(-30);
+                auditDic.Add(dateKey, a);
             }
             else
             {
-                messag = "Measured value for electricity consumption went over red zone of 6800";
+                XmlWriterSettings settings = new XmlWriterSettings
+                {
+                    Indent = true,
+                    IndentChars = "\t" // Use tab for indentation (optional)
+                };
+                using (XmlWriter writer = XmlWriter.Create($"{existingAudit}",settings))
+                {
+                    writer.WriteStartDocument();
+                    writer.WriteStartElement("rows");
+                    writer.WriteStartElement("row");
+                    writer.WriteElementString("ID", "102");
+                    writer.WriteElementString("TIME_STAMP", $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}");
+                    writer.WriteElementString("MESSAGE_TYPE", $"{typ}");
+                    string messag = "";
+                    if (typ == messageType.Error)
+                    {
+                        messag = $"There is no data for date {date.Date.ToString("yyyy-MM-dd")} in the database";
+                    }
+                    else if (typ == messageType.Info)
+                    {
+                        messag = "Data is successfully read and forwarded";
+                    }
+                    else
+                    {
+                        messag = "Measured value for electricity consumption went over red zone of 6800";
+                    }
+                    writer.WriteElementString("MESSAGE", $"{messag}");
+                    writer.WriteEndElement();
+                    writer.WriteEndElement();
+                    writer.WriteEndDocument();
+                }
             }
-            XmlElement m = xmlDocument.CreateElement("MESSAGE");
-            m.InnerText = messag;
-            row.AppendChild(m);
-            rows.AppendChild(row);
-            xmlDocument.Save(existingAudit);
-            Audit a = new Audit(i, date, typ, messag);
-            response.Answer(null, a);
-            DateTime dateKey = DateTime.Now.AddMinutes(-30);
-            auditDic.Add(dateKey, a);
+            
         }
 
         private void SearchThroughDictionary(Dictionary<DateTime,List<Load>> dict,DateTime date,IResponse response, ref int k)
@@ -297,14 +338,14 @@ namespace Electricity_server
 
 
 
-        public void StartCleanup<T>(Dictionary<DateTime,T> things)
+        public void StartCleanup(Dictionary<DateTime,List<Load>> things,Dictionary<DateTime,Audit> pairs)
         {
             lock (lockObject)
             {
                 if (!isRunning)
                 {
                     isRunning = true;
-                    cleanupThread = new Thread(() => CleanupThreadWorker(things));
+                    cleanupThread = new Thread(() => CleanupThreadWorker(things, pairs));
                     cleanupThread.Start();
                 }
             }
@@ -332,13 +373,13 @@ namespace Electricity_server
             
         }
 
-        private void CleanupThreadWorker<T>(Dictionary<DateTime,T> dictionary)
+        private void CleanupThreadWorker(Dictionary<DateTime,List<Load>> dictionary, Dictionary<DateTime,Audit> keyValues)
         {
             while (true)
             {
                 DateTime currentTime = DateTime.Now;
                 List<DateTime> expiredKeys = new List<DateTime>();
-
+                List<DateTime> keys = new List<DateTime>();
                 lock (lockObject)
                 {
                     foreach (var kvp in dictionary)
@@ -354,10 +395,23 @@ namespace Electricity_server
                     {
                         dictionary.Remove(key);
                     }
+                    foreach (var kvp in keyValues)
+                    {
+                        if (currentTime - kvp.Key > timeSpanValue)
+                        {
+                            keys.Add(kvp.Key);
+                            OnItemExpired(kvp.Key);
+                        }
+                    }
+
+                    foreach (DateTime key in keys)
+                    {
+                        dictionary.Remove(key);
+                    }
                 }
 
                 // Sleep for a specified interval before checking again
-                Thread.Sleep(TimeSpan.FromMinutes(5)); // Adjust the interval as needed
+                Thread.Sleep(200); // Adjust the interval as needed TimeSpan.FromMinutes(5)
 
                 lock (lockObject)
                 {

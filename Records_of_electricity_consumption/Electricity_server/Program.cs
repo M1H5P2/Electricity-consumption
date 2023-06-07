@@ -17,12 +17,12 @@ namespace Electricity_server
                 Console.WriteLine("Press [Enter] to exit");
                 Request r = new Request();
                 r.ItemExpired += DictionaryCleanup_ItemExpired;
-                r.StartCleanup<List<Common.Load>>(Request.dic);
+                r.StartCleanup(Request.dic,Request.auditDic);
                 r.StopCleanup();
-                Request r1 = new Request();
-                r1.ItemExpired += DictionaryCleanup_ItemExpired;
-                r1.StartCleanup<Common.Audit>(Request.auditDic);
-                r1.StopCleanup();
+                //Request r1 = new Request();
+                //r1.ItemExpired += DictionaryCleanup_ItemExpired;
+                //r1.StartCleanup<Common.Audit>(Request.auditDic);
+                //r1.StopCleanup();
                 Console.ReadKey();
                 svc.Close();
             }
